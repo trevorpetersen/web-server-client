@@ -12,7 +12,8 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.SocketFactory;
 import java.net.URISyntaxException;
-import java.net.URI;
+import java.net.URL;
+import java.net.MalformedURLException;
 
 public class CustomHTTPConnection{
   public final static String GET = "GET";
@@ -51,15 +52,6 @@ public class CustomHTTPConnection{
       }else{
         this.endpoint = endpoint;
       }
-    }
-
-    private String stripProtocol(String text){
-      String HTTPS = "https://";
-      int index = text.indexOf(HTTPS);
-      if( index == 0){
-        text = text.substring(HTTPS.length());
-      }
-      return text;
     }
 
     public void setHeaders(List<Pair<String, String>> headers){
@@ -209,28 +201,38 @@ public class CustomHTTPConnection{
 
 
   private Socket socket;
+  private URL url;
   private HTTPRequest request;
   private HTTPResponse response;
 
   public CustomHTTPConnection(String url) throws URISyntaxException, IOException{
     String hostName = getDomainName(url);
-    this.socket = getSocket(hostName, 443);
+    System.out.println(hostName);
+    this.socket = getSocket(hostName);
     this.request = new HTTPRequest();
     setHostName(hostName);
     request.setEndpoint(url.substring(url.indexOf(hostName) + hostName.length()));
   }
 
-  private Socket getSocket(String hostName, int port) throws IOException{
-    SocketFactory fac = SSLSocketFactory.getDefault();
-    Socket socketSSL = fac.createSocket(hostName, port);
-    socketSSL.setSoTimeout(3000);
-
-    return socketSSL;
+  private Socket getSocket(String hostName) throws IOException{
+    if(url.getProtocol().equals("http")){
+      return new Socket(hostName, 80);
+    }else{
+      SocketFactory fac = SSLSocketFactory.getDefault();
+      Socket socketSSL = fac.createSocket(hostName, 443);
+      socketSSL.setSoTimeout(3000);
+      return socketSSL;
+    }
   }
 
-  public static String getDomainName(String url) throws URISyntaxException {
-    URI uri = new URI(url);
-    return uri.getHost();
+  public String getDomainName(String urlString) throws MalformedURLException{
+      url = null;
+    try{
+      url = new URL(urlString);
+    }catch(Exception MalformedURLException){
+      url = new URL("https://" + urlString);
+    }
+    return url.getHost();
   }
 
   public String makeRequest(String requestType){
