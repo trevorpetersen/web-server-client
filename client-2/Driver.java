@@ -15,10 +15,12 @@ public class Driver{
   public static void main(String[] args) throws Exception{
     System.out.print("Enter a website to visit: ");
     String userInput = System.console().readLine();
+    System.out.print("");
     CustomHTTPConnection con = new CustomHTTPConnection(userInput);
 
-    con.makeRequest("GET");
+    con.setRequestType("GET");
 
+    con.makeRequest();
     System.out.println(con.getResponse());
   }
 

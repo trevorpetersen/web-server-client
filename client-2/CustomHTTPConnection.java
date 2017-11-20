@@ -14,6 +14,7 @@ import javax.net.SocketFactory;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.MalformedURLException;
+import java.net.URLEncoder;
 
 public class CustomHTTPConnection{
   public final static String GET = "GET";
@@ -29,6 +30,7 @@ public class CustomHTTPConnection{
     String hostName;
     String protocolVersion;
     List<Pair<String, String>> headers;
+    List<Pair<String, String>> data;
 
     public HTTPRequest(){
       this.requestType = GET;
@@ -36,6 +38,7 @@ public class CustomHTTPConnection{
       this.endpoint = "/";
       this.protocolVersion = "HTTP/1.1";
       this.headers = new ArrayList<Pair<String, String>>();
+      this.data= new ArrayList<Pair<String, String>>();
     }
 
     public void setHostName(String hostName){
@@ -43,7 +46,12 @@ public class CustomHTTPConnection{
     }
 
     public void setRequestType(String requestType){
-      this.requestType = requestType;
+      switch(requestType){
+        case GET:
+        case POST:
+          this.requestType = requestType;
+          break;
+      }
     }
 
     public void setEndpoint(String endpoint){
@@ -60,6 +68,10 @@ public class CustomHTTPConnection{
 
     public void addHeader(Pair<String, String> headerPair){
       headers.add(headerPair);
+    }
+
+    public void addPostParam(String key, String value){
+      data.add(new Pair<String, String>(key, value));
     }
 
     public Pair<String, String> findHeader(String key){
@@ -80,7 +92,40 @@ public class CustomHTTPConnection{
       }else{
         addHeader(headerPair);
       }
+    }
 
+    public void removeHeader(String key){
+      for(int i = 0; i < headers.size(); i++){
+        Pair pair = headers.get(i);
+        if(pair.getFirst().equals(key)){
+          headers.remove(i);
+          break;
+        }
+      }
+    }
+
+    private String getEncodedData(){
+      StringBuilder sb = new StringBuilder();
+      boolean isFirst = true;
+
+      for(Pair<String, String> pair : data){
+        if(isFirst){
+          isFirst = false;
+        }else{
+          sb.append("&");
+        }
+
+        try{
+          String encodedKey = URLEncoder.encode(pair.getFirst(), "UTF-8");
+          String encodedValue = URLEncoder.encode(pair.getSecond(), "UTF-8");
+
+          sb.append(encodedKey + "=" + encodedValue);
+        }catch(Exception e){
+          System.err.println("Failed to encode post parameters");
+        }
+      }
+
+      return sb.toString();
     }
 
     public String getInitialRequestLine(){
@@ -90,6 +135,13 @@ public class CustomHTTPConnection{
     private void updateDefaultHeaders(){
       overwriteHeader(new Pair<String, String>("Host", hostName));
       overwriteHeader(new Pair<String, String>("Connection", "close"));
+      if(requestType.equals(POST)){
+        overwriteHeader(new Pair<String, String>("Content-Type", "application/x-www-form-urlencoded"));
+        overwriteHeader(new Pair<String, String>("Content-Length", getEncodedData().getBytes().length + ""));
+      }else{
+        removeHeader("Content-Type");
+        removeHeader("Content-Length");
+      }
     }
 
     private String getFormattedHeaders(){
@@ -105,9 +157,17 @@ public class CustomHTTPConnection{
     public String toString(){
 
       updateDefaultHeaders();
-      return getInitialRequestLine() +
-             getFormattedHeaders() +
-             END_LINE;
+      String req = getInitialRequestLine() +
+                   getFormattedHeaders() +
+                   END_LINE;
+
+      if(requestType.equals(POST)){
+        return req +
+               getEncodedData();
+      }else{
+        return req;
+      }
+
     }
   }
 
@@ -207,7 +267,6 @@ public class CustomHTTPConnection{
 
   public CustomHTTPConnection(String url) throws URISyntaxException, IOException{
     String hostName = getDomainName(url);
-    System.out.println(hostName);
     this.socket = getSocket(hostName);
     this.request = new HTTPRequest();
     setHostName(hostName);
@@ -235,7 +294,11 @@ public class CustomHTTPConnection{
     return url.getHost();
   }
 
-  public String makeRequest(String requestType){
+  public void addPostParam(String key, String value){
+    request.addPostParam(key, value);
+  }
+
+  public String makeRequest(){
 
     String responseString = "";
     try{
@@ -265,6 +328,10 @@ public class CustomHTTPConnection{
     request.setHostName(hostName);
   }
 
+  public void setRequestType(String requestType){
+    request.setRequestType(requestType);
+  }
+
   public List<Pair<String,String>> getResponseHeaders(){
     return response.getHeaders();
   }
@@ -281,6 +348,10 @@ public class CustomHTTPConnection{
     }
 
     return null;
+  }
+
+  public String getRequest(){
+    return request.toString();
   }
 
   public String getResponse(){
